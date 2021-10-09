@@ -1,0 +1,246 @@
+---
+title: Analysis of the U.S. National Oceanic and Atmospheric Administration's (NOAA)
+  storm database
+author: "EPriske"
+date: "8 Oktober 2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Sypnosis
+
+
+The objective from this analysis is to observe what Event type were the ones causing the most Injuries, Fatalities and property damage in USA. To be able to do this analysis we used the U.S. National Oceanic and Atmospheric Administration's (NOAA) storm database. 
+
+This database tracks characteristics of major storms and weather events in the United States, including when and where they occur, as well as estimates of any fatalities, injuries, and property damage.
+
+We used the complete period of the database which is 1952 to 2011 and we want to summarize all the results from the Database to see everything in a Macro base.
+
+
+
+## Data loading and processing
+
+
+# Required Libraries for the analysis
+
+
+```{r, error=FALSE, warning=FALSE, message=FALSE}
+library(dplyr)
+library(ggplot2)
+library(RColorBrewer)
+library(lubridate)
+library(gridExtra)
+library(chron)
+```
+
+
+
+# Downloading the data.
+
+
+First we check if we have the file already in our working directory. If not we download it.
+
+
+
+```{r}
+if(!file.exists("StormData")){
+  fileURL <- "https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2FStormData.csv.bz2"
+  download.file(fileURL, "StormData")
+  data <- read.csv('C:/Users/priskeer/Desktop/PilotTest24.02.2021/ProjectExtras/Privat/School/Data Science/Course 5/Week4/StormData', header=T)
+  storm <- data
+  storm <- data.frame(storm)
+}
+
+if(file.exists("StormData")){
+  data <- read.csv('C:/Users/priskeer/Desktop/PilotTest24.02.2021/ProjectExtras/Privat/School/Data Science/Course 5/Week4/StormData', header=T)
+  storm <- data
+  storm <- data.frame(storm)
+}
+
+```
+
+
+# Processing the Data
+
+
+We want to analyse what Event type is responsable for the most injuries, fatalities and property damage, so the first step is to process the database.
+
+We remove every variable we dont need for this analysis. The remaining variables we change them to a correctly class for our needs.
+
+At the end we observe the summary from our remaining data.
+
+
+
+```{r}
+storm <- storm[-c(9:22, 26:37)]
+storm$BGN_DATE <- as.character(storm$BGN_DATE)
+storm$BGN_DATE <- as_date(mdy_hms(storm$BGN_DATE), tz=NULL)
+storm$COUNTY <- as.factor(storm$COUNTY)
+storm$STATE <- as.factor(storm$STATE)
+
+head(storm)
+summary(storm)
+str(storm)
+
+```
+
+
+
+## Results
+
+
+# What state has the most Events in USA?
+
+
+The first question that we want to answer is which state in USA has the most events happening on the period of 1952-2011. We want to know the top 8 of the states with the most events in the same period.
+
+First we aggregate the data by Event type and State and order it in descending order and then we plot it using ggplot2.
+
+
+
+```{r}
+EventState <- aggregate(EVTYPE ~ STATE, storm, FUN = length)
+EventState %>%
+  arrange(desc(EVTYPE)) %>%
+  slice(1:8) %>%
+  ggplot(aes(x = reorder(STATE, -EVTYPE), y = EVTYPE, fill = STATE)) +
+  geom_col(size = 2) +
+  labs(title = "Total Event Types per State", subtitle = "From 1952 to 2011") +
+  ylab("Count of Events") +
+  xlab("State") +
+  theme_classic() +
+  scale_fill_brewer(palette = "Set3")
+```
+
+
+
+The result show us that Texas is the State with the most events happening with more than 80,000 events happening in the period from 1952-2011.
+
+
+# What event type is the most ocurring?
+
+Next we want to know what is the most recurring Event Type in USA in the period of 1952-2011.
+
+Here we summarize all the Events to know which one is the most recurring, then we sort them in descending order and we choose only the top 8 of the events. At the end we plot the data using ggplot2.
+
+
+
+```{r}
+EventT <- sort(table(storm$EVTYPE), decreasing = TRUE)
+EventT <- EventT[1:8]
+EventT <- data.frame(EventT)
+colnames(EventT) <- c("EVTYPE", "Frequency")
+EventT %>%
+  ggplot(aes(x = EVTYPE, y = Frequency, fill = EVTYPE)) +
+  geom_col(size = 2) +
+  labs(title = "Total Event in USA", subtitle = "From 1952 to 2011") +
+  scale_y_continuous(name="Count of Events", labels = scales::comma) +
+  xlab("Event Type") +
+  theme_classic(base_size = 7) +
+  scale_fill_brewer(palette = "Set3")
+```
+
+
+
+Here we see that the most recurring event happening in the USA is Hail than TSTM wind. Tornado takes the 4th place.
+
+
+
+# Fatalities, Injuries, Property Damage per Event type
+
+
+We want to know which event causes the most injuries and Fatalities and Property Damage.
+
+First we summarise and create a new Data frame for each of the variables to analyse.
+
+
+
+```{r}
+#We want to know which event causes the most injuries and Fatalities and Property Damage.
+#First we summarise and create a new Data frame with the new data.
+EventDMG <- data.frame(storm[8:11])
+EventDMG <- EventDMG %>% 
+              group_by(EVTYPE) %>%
+              summarise(
+                FATALITIES = sum(FATALITIES),
+                INJURIES = sum(INJURIES),
+                PROPDMG = sum(PROPDMG)
+    
+  )
+
+#Top 8 from Event Type ordered by Fatalities
+EventF <- EventDMG[1:2]
+EventF <- EventF[order(EventF$FATALITIES, decreasing = TRUE),]
+EventF <- EventF[1:8,]
+
+#Top 8 from Event Type ordered by Injuries
+EventI <- select(EventDMG, 1, 3)
+EventI <- EventI[order(EventI$INJURIES, decreasing = TRUE),]
+EventI <- EventI[1:8,]
+
+#Top 8 from Event Type ordered by Property Damage
+EventP <- select(EventDMG, 1, 4)
+EventP <- EventP[order(EventP$PROPDMG, decreasing = TRUE),]
+EventP <- EventP[1:8,]
+```
+
+
+
+Now we want to plot this information with the top 8 from every Variable
+
+
+
+```{r}
+require(gridExtra)
+
+plot1 <- EventF %>%
+  ggplot(aes(x = reorder(EVTYPE, -FATALITIES), y = FATALITIES, fill = EVTYPE)) +
+  geom_col(size = 2) +
+  labs(title = "Top 8 Fatalities per Event Type", subtitle = "From 1952 to 2011") +
+  scale_y_continuous(name="Count of Fatalities", labels = scales::comma) +
+  xlab("Event Type") +
+  theme_classic(base_size = 7) +
+  scale_fill_brewer(palette = "Set1") +
+  guides(fill="none")
+
+plot2 <- EventI %>%
+  ggplot(aes(x = reorder(EVTYPE, -INJURIES), y = INJURIES, fill = EVTYPE)) +
+  geom_col(size = 2) +
+  labs(title = "Top 8 Injuries per Event Type", subtitle = "From 1952 to 2011") +
+  scale_y_continuous(name="Count of Injuries", labels = scales::comma) +
+  xlab("Event Type") +
+  theme_classic(base_size = 7) +
+  scale_fill_brewer(palette = "Set2") +
+  guides(fill="none")
+
+plot3 <- EventP %>%
+  ggplot(aes(x = reorder(EVTYPE, -PROPDMG), y = PROPDMG, fill = EVTYPE)) +
+  geom_col(size = 2) +
+  labs(title = "Top 8 Propertie Damage per Event Type", subtitle = "From 1952 to 2011") +
+  scale_y_continuous(name="Sum of Propertie Damage", labels = scales::comma) +
+  xlab("Event Type") +
+  theme_classic(base_size = 7) +
+  scale_fill_brewer(palette = "Set3") +
+  guides(fill="none")
+
+grid.arrange(plot1, plot2, plot3, nrow=3)
+```
+
+
+
+We observe the top 5 for every variable
+
+
+
+```{r}
+head(EventF)
+head(EventI)
+head(EventP)
+```
+
+
+
+Here we find out that Tornado is the event type that cause the most Damage, Injuries and Fatalities.
